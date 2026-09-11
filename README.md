@@ -39,10 +39,141 @@ graph TD
 ## Stack
 
 - **Web:** Vite, React, TypeScript, MUI
-- **API:** Node.js, Express, JWT
-- **Demo store:** JSON file (swap for Postgres in production)
+- **API:** Node.js, Express (`apps/api`)
 
 ---
+
+## System layout
+
+Frontend and API ship independently. The web client talks to `apps/api` over REST.
+
+```mermaid
+graph LR
+    Web[noah-frontend] -->|REST / signed URLs| API[apps/api]
+    API --> DB[(PostgreSQL)]
+    API --> Redis[(Redis)]
+    Web --> Platform[src/platform]
+```
+
+### Frontend (`noah-frontend`)
+
+Vite + React + TypeScript. Library routes live under `/home`; the admin console under `/platform`.
+
+```
+noah-frontend/
+├── src/
+│   ├── api/                          # HTTP clients
+│   │   ├── client.ts                 # Axios instance, auth header, 401 handling
+│   │   ├── auth.service.ts
+│   │   ├── media.service.ts
+│   │   ├── library.service.ts
+│   │   ├── annotations.service.ts
+│   │   ├── organizations.service.ts
+│   │   ├── billing.service.ts
+│   │   ├── share.service.ts
+│   │   ├── usage.service.ts
+│   │   └── users.service.ts
+│   ├── auth/                         # Session, protected / guest routes
+│   ├── pages/
+│   │   ├── MarketingLandingPage.tsx
+│   │   ├── LoginPage.tsx / SignUpPage.tsx
+│   │   ├── OnboardingPlanPage.tsx
+│   │   ├── DashboardPage.tsx         # All media, favorites, projects, shared
+│   │   ├── FolderPage.tsx
+│   │   ├── ProjectPage.tsx
+│   │   ├── VideoPlayerPage.tsx       # Player + right-rail annotations
+│   │   ├── TagsManagementPage.tsx
+│   │   ├── UserActivitiesPage.tsx
+│   │   ├── TrashPage.tsx
+│   │   └── settings/
+│   ├── layouts/
+│   │   ├── DashboardLayout.tsx       # Sidebar + header + upload queue
+│   │   ├── MediaViewerLayout.tsx
+│   │   └── SettingsLayout.tsx
+│   ├── components/
+│   │   ├── dashboard/                # Sidebar, workspace switcher, upload, library grid
+│   │   ├── media/                    # Player, timecode comments, drawing, collaborators
+│   │   ├── settings/
+│   │   ├── onboarding/               # Plan selection
+│   │   └── landing/
+│   ├── context/                      # Dashboard, upload manager, workspace state
+│   ├── hooks/
+│   ├── constants/                    # Permissions, roles, layout
+│   ├── theme/
+│   ├── styles/
+│   ├── types/
+│   ├── utils/
+│   └── platform/                     # Super-admin console (plans, orgs, users, billing)
+│       ├── pages/
+│       ├── api/
+│       └── layouts/
+├── public/
+└── package.json
+```
+
+Library navigation: **workspace → folder / project → all media → player**.
+
+### API (`apps/api`)
+
+Independent Express app: routes → controllers → services.
+
+```
+apps/api/
+├── src/
+│   ├── index.ts
+│   ├── worker.ts
+│   ├── config/
+│   ├── middleware/
+│   ├── routes/
+│   │   ├── auth-routes.js
+│   │   ├── organizations.js
+│   │   ├── workspaces.js
+│   │   ├── library.js
+│   │   ├── media.js
+│   │   ├── annotations.js
+│   │   ├── tags.js
+│   │   ├── share-routes.js
+│   │   ├── stripe.js
+│   │   ├── usage.js
+│   │   └── platform.js
+│   ├── controller/
+│   │   ├── authController.js
+│   │   ├── organizationsController.js
+│   │   ├── workSpaceController.js
+│   │   ├── libraryController.js
+│   │   ├── mediaController.js
+│   │   ├── annotationController.js
+│   │   ├── tagController.js
+│   │   ├── shareController.js
+│   │   ├── stripe.controller.js
+│   │   └── platform-*.controller.js
+│   ├── services/
+│   │   ├── auth-service.js
+│   │   ├── workspace.service.js
+│   │   ├── media.service.js
+│   │   ├── libraryListService.js
+│   │   ├── stripe.service.js
+│   │   └── usage-meter.service.js
+│   ├── lib/                      # RBAC policy, audit log
+│   ├── utils/
+│   └── templates/emails/
+└── scripts/                      # Permission + access-level seeds
+```
+
+Domain map:
+
+| Area | Routes | Controllers |
+| --- | --- | --- |
+| Identity & org | `auth-routes`, `organizations`, `users` | `authController`, `organizationsController`, `userController` |
+| Library | `workspaces`, `library`, `media`, `tags` | `workSpaceController`, `libraryController`, `mediaController`, `tagController` |
+| Review | `annotations`, `share-routes` | `annotationController`, `shareController` |
+| Commercial | `stripe`, `usage` | `stripe.controller`, `usageController` |
+| Platform admin | `platform` | `platform-*.controller` |
+
+RBAC lives in `apps/api/src/lib/rbac-policy.js` (Viewer vs Collaborator / Editor / Admin / Super Admin).
+
+---
+
 
 ## Quick start
 
